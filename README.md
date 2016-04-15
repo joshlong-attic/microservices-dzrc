@@ -179,19 +179,76 @@ class ApiClientRestController {
 ### Edge Services: Micro Proxies and API Gateways
 client-side load-balancing is only used within the data center, or within the cloud, when making requests from one service to another. All of these services live behind the firewall. Services that live at the age of the datacenter, exposed to public traffic, are exposed using DNS. An HTML5, Android, Playstation, or iPhone applications will not use Ribbon. Service exposed at the edge have to be more defensive; they cannot propagate exceptions to the client. Edge services are intermediaries, and an ideal place to insert API translation or protocol translation. Take for example an HTML5 application. An HTML5 applications can't run afoul of CORS restrictions: it must issue requests to the same host and port. A possible route might be to add a policy to every backend microservice that lets the client make requests. This of course is untenable and unscalable as you add more and more microservices.  Instead, organizations like netlfix use a microproxy like [Netflix's Zuul](https://github.com/Netflix/zuul). A microproxy like Zuul simply forwards all requests at the edge service to the backend microservices as enumerated in a registry. If your application is an HTML5  application it might be enough to standup a microproxy, insert HTTP BASIC or OAuth security, use HTTPS, and be done with it.
 
+```java
+@EnableZuulProxy
+@EnableCircuitBreaker
+@EnableDiscoveryClient
+@SpringBootApplication
+public class EdgeServiceApplication {
+
+  public static void main(String[] args) {
+    SpringApplication.run(EdgeServiceApplication.class, args);
+  }
+}
+
+@RestController
+class TradesStreamingApiGateway {
+
+  @Autowired
+  private MarketService marketService;
+
+  @RequestMethod(method=HttpMethod.GET, value = "/market/trades")
+  public SseEmitter trades() {
+    SseEmitter sseEmitter = new SseEmitter();
+    Observable<StockTrade> trades = marketService.observeTrades();  // RxJava
+    trades.subscribe( value -> notifyNewTrade(sseEmitter, value),
+      sseEmitter::completeWithError,
+      sseEmitter::complete
+    );
+    return sseEmitter;
+  }
+
+  private void notifyNewTrade(SseEmitter sseEmitter, Trade t) {
+    try {
+      sseEmitter.send(t);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+}
+```
+
 Sometimes the client needs a coarser-grained view of the data coming from the services. This implies API translation. An edge service, stood up using something like Spring Boot, might use Reactive programming technologies like [Netflix's RxJava](https://github.com/ReactiveX/RxJava), Typesafe's [Akka](http://Akka.io), [RedHat's Vert.x](http://vertx.io/), and [Pivotal's Reactor](http://projectreactor.io/)  to compose requests and transformations across multiple services into a single response. Indeed, all of these implementat  common API called the [reactive streams API](http://www.reactive-streams.org/) because this subset of problems is so common.
 
 ### Clustering Primitives
 In a complex distributed systems, there are many actors with many roles to play. Cluster coordination and cluster consensus is one of the most difficult problems to solve. How do you handle leadership election, active/passive handoff or global locks? Thankfully,  many technologies provide the primitives required to support this sort of coordination, including Apache Zookeeper, [Redis](http://redis.io) and [Hazelcast](https://hazelcast.com/). [Spring Cloud's Cluster](http://start.spring.io) support provides a clean integration with all of these technologies.
 
+```java
+// this is triggered when configured (Zookeeper,
+// Hazelcast, or ETCD) cluster leadership-change event is triggered
+@Component
+class LeadershipApplicationListener
+  implements ApplicationListener<AbstractLeaderEvent> {
+
+  @Override
+  public void onApplicationEvent(AbstractLeaderEvent event) {
+    // do something with OnGrantedEvent or OnRevokedEvent
+  }
+}
+```
+
 ### Messaging, CQRS and Stream Processing
 When you move into the world of microservices, state synchronization becomes more difficult. The reflex of the experienced architect might be to reach for distributed transactions, a la JTA. Ignore this urge at all costs. Transactions are a stop-the-world approach to state synchronization and slow the system as a whole; the worst possible outcome in a distributed system. Instead, services today use eventual consistency through messaging to ensure that state eventually reflects the correct system worldview. REST is a fine technology for _reading_ data but it doesn't provide any guarantees about the propagation and eventual processing of a transaction. Actor systems like [Typesafe Akka](http://akka.io) and message brokers like [Apache ActiveMQ](http://activemq.apache.org/), [Apache Kafka](http://kafka.apache.org/), [RabbitMQ](http://rabbitmq.com) or [even Redis](http://redis.io/) have become the norm. Akka provides a supervisory system guarantees a message  will be processed at- least once. If you're using messaging, there are many APIs that can simplify the chore including [Apache Camel](http://camel.apache.org/), [Spring Integration](http://projects.spring.io/spring-integration/) and - at a higher abstraction level and focusing specifically on the aforementioned Kafka, RabbitMQ and Redis, Spring Cloud Stream. Using messaging for writes and use REST for reads optimizes reads separately from writes. The  [Command Query Responsibility Segregation](http://martinfowler.com/bliki/CQRS.html), or CQRS, design pattern specifically describes this approach.
 
 ### Circuit Breakers
-In a microservice system it's critical that services be designed to be fault-tolerant: if something happens then they should gracefully degrade.  Systems are complex, living things. Failure in one system _can_ trigger a domino effect across other systems if care isn't taken to isolate them. One way to prevent failure cascades is to use a _circuit-breaker_. A circuit-breaker is a stateful component around potentially shaky service-to-service calls that - when something goes wrong - prevents further traffic across the downed path. The circuit will slowly attempt to let traffic through until the pathway is closed again. [Netflix's Hystrix circuit-breaker](https://github.com/Netflix/Hystrix) is a very popular option, complete with a usual dashboard by which to aggregate and visualize potentially open circuits in a system. Wildfly Swarm, as of this writing in Q3 2015, has support for using Hystrix in master, and the [Play framework](https://www.playframework.com/) provides support for circuit breakers. Naturally, Spring Cloud also has deep support for Hystrix and we're investigating a possible integration with [JRugged](https://github.com/Comcast/jrugged).
+In a microservice system it's critical that services be designed to be fault-tolerant: if something happens then they should gracefully degrade.  Systems are complex, living things. Failure in one system _can_ trigger a domino effect across other systems if care isn't taken to isolate them. One way to prevent failure cascades is to use a _circuit-breaker_. A circuit-breaker is a stateful component around potentially shaky service-to-service calls that - when something goes wrong - prevents further traffic across the downed path. The circuit will slowly attempt to let traffic through until the pathway is closed again. [Netflix's Hystrix circuit-breaker](https://github.com/Netflix/Hystrix) is a very popular option, complete with a usual dashboard by which to aggregate and visualize potentially open circuits in a system. Wildfly Swarm has support for using Hystrix in master, and the [Play framework](https://www.playframework.com/) provides support for circuit breakers. Naturally, Spring Cloud also has deep support for Hystrix and we're investigating a possible integration with [JRugged](https://github.com/Comcast/jrugged).
+
+<img src="images/hystrix-dashboard.png" />
 
 ### Distributed Tracing
 A microservice system with REST, messaging and proxy egress and ingress points can be very hard to reason about in the aggregate: how do you trace - correllate - requests across a series of services and understand where something may have failed? This is ver difficult without a sufficient upfront investment in a tracing strategy. [Google's Dapper](http://research.google.com/pubs/pub36356.html) first described such a distributed tracing tool. Google's Dapper paper paved the way for many other such systems including one at Netflix, which they have not open-sourced. [Apache HTRace is also Dapper-inspired](http://incubator.apache.org/projects/htrace.html). [Twitter's Zipkin](https://blog.twitter.com/2012/distributed-systems-tracing-with-zipkin) is open-source and actively maintained. It provides the infrastructure and a visually appealing dashboard on which you can view waterfall graphs of calls across services. Spring Cloud has a module called Spring Cloud Sleuth that provides correlation IDs and instrumentation across various components. Spring Cloud Zipkin integrates Twitter Zipkin in terms of the Spring Cloud Sleuth API. Once added to a Spring Cloud module, requests across messaging endpoints using Spring Cloud Stream, REST calls using the `RestTemplate`, and HTTP requests powered by Spring MVC are all transparently and automatically traced.
+
+<img src="images/zipkin-traces.png" />
 
 
 ### Single Sign-On
