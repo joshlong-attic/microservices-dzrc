@@ -305,7 +305,7 @@ class EdgeService {
     // ..
   }
 
-  // the dashboard will show a circuit named 'names'
+  // the dashboard will show a circuit named 'reservation-service'
   @HystrixCommand(fallbackMethod = "fallback")
   @RequestMapping(method = RequestMethod.GET, value = "/names")
   public Collection<String> names() {
@@ -331,4 +331,4 @@ Security is hard. In a distributed system, it is critical to ascertain the provi
 
 # A Cloud Native Architecture is an Agile Architecture
 
-Instead, systems must optimize for time-to-remediation; when a service goes down, how quickly can the system replace it? If time-to-remediation is 0 seconds, then the system is (apparently) highly available 100% of the time. The apparent appearance of the system is the same in a single-node  service that is 100% highly available, but it has _profound_ impacts on the architecture of the system. The patterns we've looked at in this refcard support building systems that are tolerant of failure and service topology changes common in a dynamic cloud environment. Remember: the goal here is to achieve velocity, and to waste as little time as possible on non-functional requirements. Automation at the platform and application tiers support this velocity. Embracing one without the other only invites undifferentiating complexity into an architecture and defeats the purpose of moving to this architecture in the first place. 
+Instead, systems must optimize for time-to-remediation; when a service goes down, how quickly can the system replace it? If time-to-remediation is 0 seconds, then the system is (apparently) highly available 100% of the time. The apparent appearance of the system is the same in a single-node  service that is 100% highly available, but it has _profound_ impacts on the architecture of the system. The patterns we've looked at in this refcard support building systems that are tolerant of failure and service topology changes common in a dynamic cloud environment. Remember: the goal here is to achieve velocity, and to waste as little time as possible on non-functional requirements. Automation at the platform and application tiers support this velocity. Embracing one without the other only invites undifferentiating complexity into an architecture and defeats the purpose of moving to this architecture in the first place.
