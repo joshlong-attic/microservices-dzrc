@@ -1,5 +1,5 @@
-# The Power, Patterns and Pains of Microservices
- by [Josh Long](http://twitter.com/starbuxman)
+#  Microservices
+by [Josh Long](http://twitter.com/starbuxman)
 
 
 ## Survival is Not Mandatory
