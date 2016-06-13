@@ -222,6 +222,8 @@ class TradesStreamingApiGateway {
 ### Clustering Primitives
 In a complex distributed systems, there are many actors with many roles to play. Cluster coordination and cluster consensus is one of the most difficult problems to solve. How do you handle leadership election, active/passive handoff or global locks? Thankfully,  many technologies provide the primitives required to support this sort of coordination, including Apache Zookeeper, [Redis](http://redis.io) and [Hazelcast](https://hazelcast.com/). [Spring Cloud's Cluster](http://start.spring.io) support provides a clean integration with all of these technologies.
 
+In the following example, we've configured a component to change its state whenever Spring Cloud Cluster emits a `OnGrantedEvent` or a `OnRevokedEvent`, which it'll do when it the underlying coordination technology promotes and demotes a leader node. 
+
 ```java
 @Component
 class LeadershipApplicationListener {
